@@ -1,8 +1,10 @@
 /**
  * GFOS write actions: stamps via the web terminal and correction requests ("Fehlende Buchung").
  *
- * Both forms were inspected read-only; the submissions themselves were never sent against live
- * GFOS, so the response handling (growl messages, confirmation step) is unverified.
+ * Stamps were verified against live GFOS: success answers with the single info growl
+ * "Information SALDO <balance>" (no time), a Gehen while clocked out with an error growl
+ * ("Fehler [...#GHG50#...]"). The correction request was never sent, so its response handling
+ * (growl messages, confirmation step) is unverified.
  */
 
 import * as cheerio from 'cheerio';
@@ -33,7 +35,11 @@ export function stamp(options: GfosClientOptions, direction: StampDirection): Pr
     const result = await session.post(terminal, 'form', { [button]: button });
     const messages = checkMessages(result, `${direction === 'in' ? 'Kommen' : 'Gehen'} stamp`, options);
     const time = messages.map((message) => message.text.match(/\b(\d{1,2}):(\d{2})\b/)).find(Boolean);
-    return { direction, time: time ? `${time[1].padStart(2, '0')}:${time[2]}` : localTime(new Date()) };
+    return {
+      direction,
+      time: time ? `${time[1].padStart(2, '0')}:${time[2]}` : localTime(new Date()),
+      messages: messages.map((message) => `[${message.severity}] ${message.text}`),
+    };
   });
 }
 

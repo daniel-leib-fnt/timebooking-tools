@@ -42,8 +42,10 @@ export interface ClockState {
 
 export interface StampResult {
   direction: StampDirection;
-  /** HH:MM as confirmed by GFOS. */
+  /** HH:MM: the time in a GFOS message, else the local time of the request (GFOS only answers with the balance). */
   time: string;
+  /** GFOS messages of the response as "[severity] text", e.g. "[info] Information SALDO -10.73". */
+  messages: string[];
 }
 
 export interface CorrectionRequest {

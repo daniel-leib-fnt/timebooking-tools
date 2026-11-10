@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { CorrectionRequest, GfosAuthError, GfosClient, GfosUnreachableError, StampDirection } from '../gfos/types';
+import { CorrectionRequest, GfosAuthError, GfosClient, GfosUnreachableError, Interval, StampDirection } from '../gfos/types';
 import { StatusFile } from '../status';
 import { netMinutes } from '../worktime';
 import { formatDuration, localDate, localTime } from './dates';
@@ -25,21 +25,42 @@ async function notify(summary: string, body: string, options: { critical: boolea
   }
 }
 
-/** Fetches the clock state from GFOS and writes it to the status file. */
-async function refreshStatus(client: GfosClient): Promise<{ status: StatusFile; since: string | null }> {
+interface Punch {
+  direction: StampDirection;
+  /** HH:MM */
+  time: string;
+}
+
+/**
+ * The Zeitkonto shows a new punch only after 5 to 15 seconds. Until then, adds the punch that GFOS
+ * just confirmed to today's intervals read from it.
+ */
+export function applyPunch(intervals: Interval[], punch: Punch): Interval[] {
+  const open = intervals.at(-1)?.out === null;
+  if (punch.direction === 'in') {
+    return open ? intervals : [...intervals, { in: punch.time, out: null }];
+  }
+  return open ? [...intervals.slice(0, -1), { ...intervals.at(-1)!, out: punch.time }] : intervals;
+}
+
+/** Fetches the clock state from GFOS and writes it to the status file; `punch` is one GFOS just confirmed. */
+async function refreshStatus(client: GfosClient, punch?: Punch): Promise<{ status: StatusFile; since: string | null }> {
   const state = await client.getClockState();
   const now = new Date();
+  const read = state.today?.intervals ?? [];
+  const intervals = punch ? applyPunch(read, punch) : read;
+  const last = intervals.at(-1);
   const status: StatusFile = {
     version: 1,
     updatedAt: now.toISOString(),
     date: state.today?.date ?? localDate(now),
-    clockedIn: state.clockedIn,
-    intervals: state.today?.intervals ?? [],
+    clockedIn: last !== undefined && last.out === null,
+    intervals,
     source: 'gfos',
     lastError: null,
   };
   await writeStatusFile(status);
-  return { status, since: state.since === null ? null : localTime(new Date(state.since)) };
+  return { status, since: status.clockedIn ? last!.in : null };
 }
 
 /** Keeps the last known clock state and only records the error, so the widget never shows a stamp that did not happen. */
@@ -69,8 +90,9 @@ export async function stamp(client: GfosClient, direction: StampDirection, optio
     source: 'cli',
   });
   let time: string;
+  let messages: string[];
   try {
-    time = (await client.stamp(direction)).time;
+    ({ time, messages } = await client.stamp(direction));
   } catch (error) {
     const message = describeError(error);
     await appendStampLog([{ ...entry(localTime(now), false), error: message }]);
@@ -81,13 +103,13 @@ export async function stamp(client: GfosClient, direction: StampDirection, optio
     throw error;
   }
 
-  await appendStampLog([entry(time, true)]);
+  await appendStampLog([{ ...entry(time, true), messages }]);
   console.log(`Clocked ${direction} at ${time}.`);
   if (options.notify) {
     await notify(`Clocked ${direction}`, `at ${time}`, { critical: false });
   }
   try {
-    await refreshStatus(client);
+    await refreshStatus(client, { direction, time });
   } catch (error) {
     // The stamp is confirmed; only the follow-up read failed.
     const message = `Clocked ${direction} at ${time}, but the status refresh failed: ${describeError(error)}`;

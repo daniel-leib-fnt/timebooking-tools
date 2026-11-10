@@ -17,6 +17,8 @@ export interface StampLogEntry {
   source: 'cli' | 'gfos-sync';
   comment?: string;
   error?: string;
+  /** GFOS messages of the stamp response. */
+  messages?: string[];
 }
 
 function stateDir(): string {
