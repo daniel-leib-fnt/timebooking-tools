@@ -5,10 +5,7 @@ import { CliArgs, HELP, parseCliArgs, UsageError } from './args';
 import { correct, describeError, stamp, status, sync } from './commands';
 
 /** `createClient` is a parameter so a fake client can be injected for manual testing. */
-export async function run(
-  argv: string[],
-  createClient: (options: GfosClientOptions) => GfosClient = createGfosClient,
-): Promise<number> {
+export async function run(argv: string[], createClient: (options: GfosClientOptions) => GfosClient = createGfosClient): Promise<number> {
   let args: CliArgs;
   try {
     args = parseCliArgs(argv, new Date());

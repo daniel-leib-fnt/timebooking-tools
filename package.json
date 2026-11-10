@@ -7,6 +7,8 @@
   },
   "scripts": {
     "build": "tsc",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "tsc && node --test 'dist/**/*.test.js'"
   },
   "dependencies": {
@@ -21,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/proper-lockfile": "^4.1.4",
+    "prettier": "3.9.10",
     "typescript": "^5.4.0"
   }
 }

@@ -5,8 +5,7 @@ import { ClockState, GfosClient, GfosClientOptions } from './types';
 import { fetchDays, localDate } from './zeitkonto';
 
 export function createGfosClient(options: GfosClientOptions = {}): GfosClient {
-  const getDays = (startDate: string, endDate: string) =>
-    withSession(options, (session) => fetchDays(session, startDate, endDate));
+  const getDays = (startDate: string, endDate: string) => withSession(options, (session) => fetchDays(session, startDate, endDate));
 
   return {
     getDays,

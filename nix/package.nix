@@ -8,7 +8,7 @@ buildNpmPackage {
     fileset = lib.fileset.unions [ ../package.json ../package-lock.json ../tsconfig.json ../src ];
   };
   nodejs = nodejs_22;
-  npmDepsHash = "sha256-VQ6VxM5yxhabWGbUOJB1JYXu71uD/R+yuLuJsr1OHD4=";
+  npmDepsHash = "sha256-YJMWrEJtJ9BICHsGNVLRSgsu0/OSXkBlEuh0kuvxm0c=";
   nativeBuildInputs = [ makeWrapper ];
 
   installPhase = ''

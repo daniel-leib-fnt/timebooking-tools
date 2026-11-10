@@ -1,18 +1,18 @@
 {
-    "KPlugin": {
-        "Authors": [
-            {
-                "Email": "daniel.leib@fntsoftware.com",
-                "Name": "Daniel Leib"
-            }
-        ],
-        "Category": "Utilities",
-        "Description": "Shows whether you are clocked in at GFOS and today's net working time",
-        "Icon": "chronometer",
-        "Id": "com.github.daniel-leib-fnt.timebooking",
-        "Name": "Timebooking",
-        "Version": "0.1"
-    },
-    "KPackageStructure": "Plasma/Applet",
-    "X-Plasma-API-Minimum-Version": "6.0"
+  "KPlugin": {
+    "Authors": [
+      {
+        "Email": "daniel.leib@fntsoftware.com",
+        "Name": "Daniel Leib"
+      }
+    ],
+    "Category": "Utilities",
+    "Description": "Shows whether you are clocked in at GFOS and today's net working time",
+    "Icon": "chronometer",
+    "Id": "com.github.daniel-leib-fnt.timebooking",
+    "Name": "Timebooking",
+    "Version": "0.1"
+  },
+  "KPackageStructure": "Plasma/Applet",
+  "X-Plasma-API-Minimum-Version": "6.0"
 }

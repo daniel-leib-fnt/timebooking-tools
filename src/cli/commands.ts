@@ -1,12 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import {
-  CorrectionRequest,
-  GfosAuthError,
-  GfosClient,
-  GfosUnreachableError,
-  StampDirection,
-} from '../gfos/types';
+import { CorrectionRequest, GfosAuthError, GfosClient, GfosUnreachableError, StampDirection } from '../gfos/types';
 import { StatusFile } from '../status';
 import { netMinutes } from '../worktime';
 import { formatDuration, localDate, localTime } from './dates';
@@ -65,8 +59,15 @@ async function markStatusLocal(error: string): Promise<void> {
 
 export async function stamp(client: GfosClient, direction: StampDirection, options: { notify: boolean }): Promise<void> {
   const now = new Date();
-  const entry = (time: string, ok: boolean): StampLogEntry =>
-    ({ ts: new Date().toISOString(), kind: 'stamp', direction, time, date: localDate(now), ok, source: 'cli' });
+  const entry = (time: string, ok: boolean): StampLogEntry => ({
+    ts: new Date().toISOString(),
+    kind: 'stamp',
+    direction,
+    time,
+    date: localDate(now),
+    ok,
+    source: 'cli',
+  });
   let time: string;
   try {
     time = (await client.stamp(direction)).time;
@@ -138,11 +139,8 @@ export async function status(client: GfosClient, options: { json: boolean }): Pr
 /** Appends every GFOS punch in the range that the stamp log does not have yet. Idempotent. */
 export async function sync(client: GfosClient, range: { from: string; to: string }): Promise<void> {
   const days = await client.getDays(range.from, range.to);
-  const key = (entry: { date: string; direction: string; time: string }) =>
-    `${entry.date} ${entry.direction} ${entry.time}`;
-  const known = new Set(
-    (await readStampLog()).filter((entry) => entry.kind === 'stamp' && entry.ok).map(key),
-  );
+  const key = (entry: { date: string; direction: string; time: string }) => `${entry.date} ${entry.direction} ${entry.time}`;
+  const known = new Set((await readStampLog()).filter((entry) => entry.kind === 'stamp' && entry.ok).map(key));
 
   const ts = new Date().toISOString();
   const missing: StampLogEntry[] = [];

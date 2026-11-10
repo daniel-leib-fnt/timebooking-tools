@@ -1,0 +1,6 @@
+dist/
+node_modules/
+package-lock.json
+flake.lock
+src/gfos/fixtures/
+plasmoid/contents/ui/worktime.js

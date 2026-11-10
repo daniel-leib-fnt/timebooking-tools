@@ -41,12 +41,15 @@ const DAY_TYPES: Record<string, DayType> = { LES: 'work', ABW: 'absence', NAZ: '
 function readColumns($: cheerio.CheerioAPI): Record<Column, number> {
   const columns: Partial<Record<Column, number>> = {};
   $('[id="form:tagesdata"] thead th').each((index, th) => {
-    const column = HEADERS[clean($(th).text()).toLowerCase().replace(/[^a-zäöü]/g, '')];
+    const column =
+      HEADERS[
+        clean($(th).text())
+          .toLowerCase()
+          .replace(/[^a-zäöü]/g, '')
+      ];
     if (column && columns[column] === undefined) columns[column] = index;
   });
-  return Object.keys(HEADERS).length === Object.keys(columns).length
-    ? (columns as Record<Column, number>)
-    : DEFAULT_COLUMNS;
+  return Object.keys(HEADERS).length === Object.keys(columns).length ? (columns as Record<Column, number>) : DEFAULT_COLUMNS;
 }
 
 /** Parses GFOS decimal hours such as "08.00", "-04.10" or "1,5"; null for empty cells. */

@@ -18,10 +18,19 @@ test('keeps one entry per dated row and skips month summaries', () => {
   assert.deepEqual(
     days.map((d) => d.date),
     [
-      '2026-04-01', '2026-04-03', '2026-04-07', '2026-04-10',
-      '2026-06-01', '2026-06-03', '2026-06-05', '2026-06-08', '2026-06-30',
-      '2026-10-30', '2026-10-31',
-      '2026-11-09', '2026-11-10',
+      '2026-04-01',
+      '2026-04-03',
+      '2026-04-07',
+      '2026-04-10',
+      '2026-06-01',
+      '2026-06-03',
+      '2026-06-05',
+      '2026-06-08',
+      '2026-06-30',
+      '2026-10-30',
+      '2026-10-31',
+      '2026-11-09',
+      '2026-11-10',
     ],
   );
 });
@@ -73,9 +82,7 @@ test('puts GFOS hints into notes', () => {
   const missingOut = day('2026-04-01');
   assert.deepEqual(missingOut.intervals, [{ in: '13:20', out: null }]);
   assert.deepEqual(missingOut.notes, ['Gehtmeldung fehlt (Kommen um 13:20).']);
-  assert.deepEqual(day('2026-06-03').notes, [
-    '10.50 Std. Anwesenheitszeit überschritten. Anwesenheitszeitgrenze von 10.00 Std.',
-  ]);
+  assert.deepEqual(day('2026-06-03').notes, ['10.50 Std. Anwesenheitszeit überschritten. Anwesenheitszeitgrenze von 10.00 Std.']);
 });
 
 test('ignores the texts of account postings', () => {

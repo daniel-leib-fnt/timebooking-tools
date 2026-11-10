@@ -63,15 +63,15 @@ export async function startMcpServer(): Promise<void> {
     async ({ startDate, endDate }) =>
       startDate > endDate
         ? errorResult('startDate must be before or equal to endDate.')
-        : runTool(() => client.getDays(startDate, endDate))
+        : runTool(() => client.getDays(startDate, endDate)),
   );
 
   server.registerTool(
     'get_clock_state',
     {
-      description: 'Return whether the user is currently clocked in, since when, and today\'s GFOS day.',
+      description: "Return whether the user is currently clocked in, since when, and today's GFOS day.",
     },
-    async () => runTool(() => client.getClockState())
+    async () => runTool(() => client.getClockState()),
   );
 
   server.registerTool(
@@ -90,7 +90,7 @@ export async function startMcpServer(): Promise<void> {
         const today = localToday();
         return (await client.getDays(startDate, endDate)).filter((day) => hasIssue(day, today));
       });
-    }
+    },
   );
 
   await server.connect(new StdioServerTransport());

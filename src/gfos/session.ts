@@ -185,7 +185,10 @@ export class GfosSession {
       throw new Error(`GFOS AJAX error ${name}: ${clean(error.find('error-message').text())}`);
     }
     const updates = $('partial-response > changes > update');
-    const viewState = updates.filter((_, update) => /javax\.faces\.ViewState/.test($(update).attr('id') ?? '')).first().text();
+    const viewState = updates
+      .filter((_, update) => /javax\.faces\.ViewState/.test($(update).attr('id') ?? ''))
+      .first()
+      .text();
     const html = updates
       .filter((_, update) => !/javax\.faces\.ViewState/.test($(update).attr('id') ?? ''))
       .map((_, update) => $(update).text())
@@ -202,7 +205,10 @@ export class GfosSession {
     return { url: page.url, html: updated.html() };
   }
 
-  private async submit(page: Page, formId: string, fields: Record<string, string>,
+  private async submit(
+    page: Page,
+    formId: string,
+    fields: Record<string, string>,
     headers: Record<string, string> = {},
   ): Promise<AxiosResponse<string>> {
     const $ = cheerio.load(page.html);
@@ -266,14 +272,14 @@ export function growlMessages(html: string): GfosMessage[] {
 
 /** Value of a double-quoted JavaScript string literal. */
 function jsString(literal: string): string {
-  return JSON.parse(
-    literal.replace(/\\x([0-9a-fA-F]{2})/g, '\\u00$1').replace(/\\(['\/])/g, '$1'),
-  ) as string;
+  return JSON.parse(literal.replace(/\\x([0-9a-fA-F]{2})/g, '\\u00$1').replace(/\\(['\/])/g, '$1')) as string;
 }
 
 /** Error texts on a page: error growls and PrimeFaces message components; empty when there are none. */
 export function errorMessages(html: string): string {
-  const growls = growlMessages(html).filter((message) => message.severity === 'error').map((message) => message.text);
+  const growls = growlMessages(html)
+    .filter((message) => message.severity === 'error')
+    .map((message) => message.text);
   const components = clean(cheerio.load(html)('.ui-messages-error, .ui-message-error').text());
   return [...growls, components].filter(Boolean).join(' ');
 }
@@ -299,10 +305,7 @@ function checked(page: Page): Page {
 function toUnreachableError(error: unknown, baseUrl: string): GfosUnreachableError | null {
   const code = axios.isAxiosError(error) ? error.code : undefined;
   if (!code || !UNREACHABLE_CODES.has(code)) return null;
-  return new GfosUnreachableError(
-    `GFOS at ${new URL(baseUrl).host} is not reachable (${code}). Is the VPN connected?`,
-    { cause: error },
-  );
+  return new GfosUnreachableError(`GFOS at ${new URL(baseUrl).host} is not reachable (${code}). Is the VPN connected?`, { cause: error });
 }
 
 function stateDir(): string {
@@ -316,8 +319,7 @@ function sessionFile(): string {
 function loadStored(account: GfosAccount): StoredSession | undefined {
   try {
     const stored = JSON.parse(readFileSync(sessionFile(), 'utf8')) as StoredSession;
-    const matches =
-      stored.version === 1 && stored.baseUrl === account.baseUrl && stored.personalnummer === account.personalnummer;
+    const matches = stored.version === 1 && stored.baseUrl === account.baseUrl && stored.personalnummer === account.personalnummer;
     return matches ? stored : undefined;
   } catch {
     return undefined;
