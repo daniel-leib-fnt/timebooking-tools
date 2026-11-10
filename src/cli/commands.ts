@@ -16,6 +16,23 @@ export function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Notification texts in German when the locale is German, else in English. */
+export function notificationTexts(direction: StampDirection, env: NodeJS.ProcessEnv = process.env) {
+  const german = (env.LC_ALL || env.LC_MESSAGES || env.LANG || '').startsWith('de');
+  if (german) {
+    return {
+      failed: direction === 'in' ? 'Einstempeln fehlgeschlagen' : 'Ausstempeln fehlgeschlagen',
+      done: direction === 'in' ? 'Eingestempelt' : 'Ausgestempelt',
+      at: (time: string) => `um ${time}`,
+    };
+  }
+  return {
+    failed: `Clock-${direction} failed`,
+    done: `Clocked ${direction}`,
+    at: (time: string) => `at ${time}`,
+  };
+}
+
 async function notify(summary: string, body: string, options: { critical: boolean }): Promise<void> {
   const urgency = options.critical ? ['--urgency=critical'] : [];
   try {
@@ -98,7 +115,7 @@ export async function stamp(client: GfosClient, direction: StampDirection, optio
     await appendStampLog([{ ...entry(localTime(now), false), error: message }]);
     await markStatusLocal(message);
     if (options.notify) {
-      await notify(`Clock-${direction} failed`, message, { critical: true });
+      await notify(notificationTexts(direction).failed, message, { critical: true });
     }
     throw error;
   }
@@ -106,7 +123,8 @@ export async function stamp(client: GfosClient, direction: StampDirection, optio
   await appendStampLog([{ ...entry(time, true), messages }]);
   console.log(`Clocked ${direction} at ${time}.`);
   if (options.notify) {
-    await notify(`Clocked ${direction}`, `at ${time}`, { critical: false });
+    const texts = notificationTexts(direction);
+    await notify(texts.done, texts.at(time), { critical: false });
   }
   try {
     await refreshStatus(client, { direction, time });
@@ -145,6 +163,8 @@ export async function status(client: GfosClient, options: { json: boolean }): Pr
     }
   } catch (error) {
     const stale = error instanceof GfosUnreachableError ? await readStatusFile() : null;
+    // Lets the widget show the error and retry sooner; the last known intervals stay.
+    await markStatusLocal(describeError(error));
     if (stale !== null) {
       if (options.json) {
         console.log(JSON.stringify(stale, null, 2));

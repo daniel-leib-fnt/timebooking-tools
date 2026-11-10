@@ -60,13 +60,15 @@ nix/            package, plasmoid and Home Manager module (programs.timebooking)
 - CLI and MCP server are thin entry points over `src/gfos/`; GFOS logic belongs in the library.
 - MCP tools are read-only. Clock-in/out and correction requests stay CLI-only, because they change the attendance record.
 - The widget never contacts GFOS; it runs `timebooking` and reads `status.json`.
+- The widget never stamps on a panel click: stamping needs the popup button and a state GFOS confirmed within the last minute, because GFOS stamps alternate and a stale state sends the wrong direction.
+- The Zeitkonto shows a stamp only 6 to 16 s after it was made; after a confirmed stamp the CLI applies the punch itself (`applyPunch` in `src/cli/commands.ts`).
 - Account settings come from environment variables (`GFOS_URL`, `GFOS_MANDANT`, `GFOS_ORG_EINHEIT`, `GFOS_PERSONALNUMMER`); the password comes from the Secret Service (`service=gfos`), `GFOS_PASSWORT` is only a fallback.
 
 ## Boundaries
 
 ### Always
 
-- Add or update tests for parser and worktime changes; show `npm test` output before claiming done.
+- Add or update tests for parser and worktime changes; show `npm test` output before claiming done. A break rule change goes into both `src/worktime.ts` and `plasmoid/contents/ui/worktime.js`; `src/worktime-plasmoid.test.ts` compares them.
 - Run `npm run format` before committing; CI fails on unformatted files.
 - Conventional Commits: `type(scope): subject`.
 - Testing the widget or CLI manually: use a throwaway `XDG_STATE_HOME` and a fake `timebooking` (see `plasmoid/README.md`), so the real attendance record is never touched.

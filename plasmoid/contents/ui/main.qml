@@ -13,26 +13,57 @@ PlasmoidItem {
 
     readonly property string statusCommand: 'cat "${XDG_STATE_HOME:-$HOME/.local/state}/timebooking/status.json"'
 
+    readonly property var texts: Qt.locale().name.startsWith("de") ? {
+        clockIn: "Einstempeln",
+        clockOut: "Ausstempeln",
+        clockedIn: "Eingestempelt",
+        notClockedIn: "Nicht eingestempelt",
+        noBookings: "Heute keine Buchungen",
+        lastUpdate: "Letzte Aktualisierung",
+        checking: "Prüfe Status bei GFOS …",
+        statusUnreadable: "Statusdatei nicht lesbar",
+        notConfirmed: "Nicht von GFOS bestätigt (lokaler Stand)",
+        refresh: "Von GFOS aktualisieren"
+    } : {
+        clockIn: "Clock in",
+        clockOut: "Clock out",
+        clockedIn: "Clocked in",
+        notClockedIn: "Not clocked in",
+        noBookings: "No bookings today",
+        lastUpdate: "Last update",
+        checking: "Checking status at GFOS …",
+        statusUnreadable: "Status file not readable",
+        notConfirmed: "Not confirmed by GFOS (local state)",
+        refresh: "Refresh from GFOS"
+    }
+
     // Parsed status.json; null until the first successful read.
     property var status: null
     property bool busy: false
+    property bool refreshing: false
     property string actionError: ""
     property date now: new Date()
 
     readonly property bool isToday: status !== null && status.date === Qt.formatDate(now, "yyyy-MM-dd")
     readonly property bool clockedIn: isToday && status.clockedIn
     readonly property var intervals: isToday ? status.intervals : []
-    readonly property string netText: Worktime.format(Worktime.netSeconds(intervals, now))
+    readonly property bool stampedToday: intervals.length > 0
+    readonly property string netText: stampedToday ? Worktime.format(Worktime.netSeconds(intervals, now)) : "-:--"
+    readonly property color netColor: !stampedToday ? "#000000" : clockedIn ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
     readonly property string warning: {
         if (actionError) return actionError;
-        if (status === null) return "Status file not readable";
+        if (status === null) return texts.statusUnreadable;
         if (status.lastError) return status.lastError;
-        if (status.source === "local") return "Not confirmed by GFOS (local state)";
+        if (status.source === "local") return texts.notConfirmed;
         return "";
     }
+    // Stamping needs a state GFOS confirmed within the last minute: a stale state sends the wrong direction.
+    readonly property bool fresh: status !== null && status.source === "gfos" && !status.lastError
+        && now - new Date(status.updatedAt) < 60 * 1000
+    readonly property bool canStamp: !busy && !refreshing && fresh
 
     function intervalLines() {
-        if (intervals.length === 0) return "No bookings today";
+        if (intervals.length === 0) return texts.noBookings;
         return intervals.map(iv => iv.in + " – " + (iv.out || "…")).join("\n");
     }
 
@@ -58,11 +89,15 @@ PlasmoidItem {
     }
 
     function refreshFromGfos() {
-        run("timebooking status --json", () => readStatus());
+        refreshing = true;
+        run("timebooking status --json", () => {
+            refreshing = false;
+            readStatus();
+        });
     }
 
     function book(clockIn) {
-        if (busy) return;
+        if (!canStamp) return;
         busy = true;
         actionError = "";
         run("timebooking " + (clockIn ? "clock-in" : "clock-out") + " --notify", (code, stdout, stderr) => {
@@ -72,6 +107,13 @@ PlasmoidItem {
             }
             readStatus();
         });
+    }
+
+    onExpandedChanged: {
+        if (expanded) {
+            actionError = "";
+            refreshFromGfos();
+        }
     }
 
     P5Support.DataSource {
@@ -91,15 +133,17 @@ PlasmoidItem {
         repeat: true
         onTriggered: root.now = new Date()
     }
+    // The CLI writes status.json on every call, also from the console; reading it is cheap.
     Timer {
-        interval: 30 * 1000
+        interval: 5 * 1000
         running: true
         repeat: true
         triggeredOnStart: true
         onTriggered: root.readStatus()
     }
+    // Retries sooner while the last refresh failed, e.g. until the VPN is connected.
     Timer {
-        interval: 5 * 60 * 1000
+        interval: root.status !== null && root.status.lastError ? 30 * 1000 : 5 * 60 * 1000
         running: true
         repeat: true
         triggeredOnStart: true
@@ -108,29 +152,17 @@ PlasmoidItem {
 
     Plasmoid.icon: "chronometer"
     preferredRepresentation: compactRepresentation
-    toolTipMainText: (clockedIn ? "Clocked in" : "Not clocked in") + " – " + netText
+    toolTipMainText: (clockedIn ? texts.clockedIn : texts.notClockedIn) + " – " + netText
     toolTipSubText: {
         let text = intervalLines();
-        if (status !== null) text += "\n\nLast update: " + Qt.formatTime(new Date(status.updatedAt), "HH:mm:ss");
+        if (status !== null) text += "\n\n" + texts.lastUpdate + ": " + Qt.formatTime(new Date(status.updatedAt), "HH:mm:ss");
         if (warning) text += "\n\n⚠ " + warning;
         return text;
     }
 
     Plasmoid.contextualActions: [
         PlasmaCore.Action {
-            text: "Clock in"
-            icon.name: "media-playback-start"
-            enabled: !root.busy && !root.clockedIn
-            onTriggered: root.book(true)
-        },
-        PlasmaCore.Action {
-            text: "Clock out"
-            icon.name: "media-playback-stop"
-            enabled: !root.busy && root.clockedIn
-            onTriggered: root.book(false)
-        },
-        PlasmaCore.Action {
-            text: "Refresh from GFOS"
+            text: root.texts.refresh
             icon.name: "view-refresh"
             onTriggered: root.refreshFromGfos()
         }
@@ -139,11 +171,7 @@ PlasmoidItem {
     compactRepresentation: MouseArea {
         Layout.minimumWidth: row.implicitWidth
         Layout.preferredWidth: row.implicitWidth
-        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-        onClicked: mouse => {
-            if (mouse.button === Qt.MiddleButton) root.expanded = !root.expanded;
-            else root.book(!root.clockedIn);
-        }
+        onClicked: root.expanded = !root.expanded
 
         RowLayout {
             id: row
@@ -155,13 +183,13 @@ PlasmoidItem {
                 text: root.netText
                 font.bold: true
                 font.features: { "tnum": 1 }
-                color: root.clockedIn ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
+                color: root.netColor
                 opacity: root.busy ? 0.4 : blink
 
-                // Blinks permanently while not clocked in.
+                // Blinks permanently while clocked out after stamping today.
                 property real blink: 1
                 SequentialAnimation on blink {
-                    running: !root.clockedIn
+                    running: root.stampedToday && !root.clockedIn
                     loops: Animation.Infinite
                     NumberAnimation { to: 0.15; duration: 500 }
                     NumberAnimation { to: 1; duration: 500 }
@@ -184,30 +212,32 @@ PlasmoidItem {
         Kirigami.Heading {
             level: 2
             text: root.netText
-            color: root.clockedIn ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
+            color: root.netColor
         }
         PlasmaComponents.Label {
             text: root.intervalLines()
         }
+        RowLayout {
+            visible: root.refreshing || root.busy
+            PlasmaComponents.BusyIndicator {
+                Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                Layout.preferredHeight: Kirigami.Units.iconSizes.small
+            }
+            PlasmaComponents.Label {
+                text: root.texts.checking
+            }
+        }
         PlasmaComponents.Label {
-            visible: root.warning !== ""
+            visible: root.warning !== "" && !root.refreshing
             text: "⚠ " + root.warning
             wrapMode: Text.Wrap
             Layout.fillWidth: true
         }
-        RowLayout {
-            PlasmaComponents.Button {
-                text: "Clock in"
-                icon.name: "media-playback-start"
-                enabled: !root.busy && !root.clockedIn
-                onClicked: root.book(true)
-            }
-            PlasmaComponents.Button {
-                text: "Clock out"
-                icon.name: "media-playback-stop"
-                enabled: !root.busy && root.clockedIn
-                onClicked: root.book(false)
-            }
+        PlasmaComponents.Button {
+            text: root.clockedIn ? root.texts.clockOut : root.texts.clockIn
+            icon.name: root.clockedIn ? "media-playback-stop" : "media-playback-start"
+            enabled: root.canStamp
+            onClicked: root.book(!root.clockedIn)
         }
     }
 }

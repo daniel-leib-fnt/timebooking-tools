@@ -2,20 +2,23 @@
 
 KDE Plasma 6 panel widget that shows whether you are clocked in at GFOS and today's net working time.
 
+- No stamps today (no status file, or a status from an earlier day): `-:--` in black.
 - Clocked in: green, counting up (`H:MM`).
-- Not clocked in: red, static (`H:MM`), blinking permanently.
+- Clocked out after stamping today: red, static (`H:MM`), blinking permanently.
 - Warning icon when the status is only local (`source: "local"`) or has `lastError`; the tooltip shows the error, today's intervals and the last update time.
-- Left click: `timebooking clock-out --notify` when clocked in, otherwise `timebooking clock-in --notify`. The time is dimmed while the command runs.
-- Middle click opens the full view (intervals, Clock in / Clock out buttons); the context menu offers the same actions plus "Refresh from GFOS".
+- Left click opens the popup: net time, today's stamps and one button, "Clock in" or "Clock out" depending on the state. A click on the panel never stamps.
+- Opening the popup refreshes from GFOS. The button is enabled only while GFOS confirmed the state within the last minute without error, because a stale state would send the wrong direction (GFOS stamps alternate). The popup stays open after a stamp and shows the confirmed result or the error.
+- The context menu offers "Refresh from GFOS".
+- Texts are German when the system locale starts with `de`, else English (`texts` in `main.qml`).
 
-Net time uses the same break rule as `src/worktime.ts` (ported to `contents/ui/worktime.js`, in seconds instead of minutes); keep both in sync.
+Net time uses the same break rule as `src/worktime.ts` (ported to `contents/ui/worktime.js`, in seconds instead of minutes); `src/worktime-plasmoid.test.ts` fails when the two differ.
 
 ## Data flow
 
 The widget never talks to GFOS itself. Through the Plasma5Support `executable` engine it:
 
-- reads `${XDG_STATE_HOME:-$HOME/.local/state}/timebooking/status.json` with `cat` every 30 s,
-- runs `timebooking status --json` every 5 min (and at start) to refresh that file from GFOS; failures are ignored, the file keeps its last state.
+- reads `${XDG_STATE_HOME:-$HOME/.local/state}/timebooking/status.json` with `cat` every 5 s, so every CLI call (also `timebooking status` in a console) shows up within 5 s,
+- runs `timebooking status --json` at start, when the popup opens, and every 5 min to refresh that file from GFOS; every 30 s while the file has a `lastError` (e.g. VPN not connected). A failed refresh keeps the last intervals and records the error in `lastError`.
 
 A status file with a `date` other than today counts as not clocked in with no intervals. `timebooking` must be on the `PATH` of `plasmashell`.
 
