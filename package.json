@@ -1,0 +1,26 @@
+{
+  "name": "timebooking-tools",
+  "version": "0.1.0",
+  "description": "CLI, MCP server and library for gfos.Workforce time tracking",
+  "bin": {
+    "timebooking": "dist/cli/main.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test 'dist/**/*.test.js'"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "axios": "^1.7.0",
+    "axios-cookiejar-support": "^7.0.0",
+    "cheerio": "^1.0.0",
+    "proper-lockfile": "^4.1.2",
+    "tough-cookie": "^6.0.1",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/proper-lockfile": "^4.1.4",
+    "typescript": "^5.4.0"
+  }
+}
