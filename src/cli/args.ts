@@ -6,6 +6,7 @@ export type Command =
   | { name: 'clock-in' | 'clock-out'; notify: boolean }
   | { name: 'status'; json: boolean }
   | { name: 'sync'; from: string; to: string }
+  | { name: 'meetings'; from: string; to: string; json: boolean }
   | { name: 'correct'; request: CorrectionRequest }
   | { name: 'mcp' }
   | { name: 'help' };
@@ -31,6 +32,8 @@ Commands:
   sync [--from DATE] [--to DATE]  Backfill punches from GFOS into the stamp log (default: last 14 days)
   correct <DATE> <in|out> <HH:MM> [--comment TEXT]
                                   Request a correction of a missing or wrong punch
+  meetings [--from DATE] [--to DATE] [--json]
+                                  List calendar entries from the ICS feed (default: today)
   mcp                             Start the MCP server on stdio
 
 Options:
@@ -38,6 +41,7 @@ Options:
   --help    Show this help
 
 Exit codes: 0 ok, 1 error, 2 GFOS not reachable.
+The calendar feed URL comes from the Secret Service (service=calendar-ics) or CALENDAR_ICS_URL.
 Files: $XDG_STATE_HOME/timebooking/status.json, stamp log $TIMEBOOKING_STAMP_LOG
 (default $XDG_STATE_HOME/timebooking/stamps.jsonl).`;
 
@@ -58,6 +62,7 @@ const COMMAND_OPTIONS: Record<Command['name'], OptionName[]> = {
   'clock-out': ['notify'],
   status: ['json'],
   sync: ['from', 'to'],
+  meetings: ['from', 'to', 'json'],
   correct: ['comment'],
   mcp: [],
   help: [],
@@ -68,6 +73,7 @@ const COMMAND_ARGUMENTS: Record<Command['name'], number> = {
   'clock-out': 0,
   status: 0,
   sync: 0,
+  meetings: 0,
   correct: 3,
   mcp: 0,
   help: 0,
@@ -93,7 +99,17 @@ function parseTime(value: string): string {
   return value;
 }
 
-/** Parses argv without the node and script entries; `today` sets the default sync range. */
+/** --from/--to with defaults, rejecting reversed ranges. */
+function parseRange(values: { from?: string; to?: string }, defaultFrom: string, defaultTo: string): { from: string; to: string } {
+  const from = parseDate(values.from ?? defaultFrom, '--from');
+  const to = parseDate(values.to ?? defaultTo, '--to');
+  if (from > to) {
+    throw new UsageError(`--from ${from} is after --to ${to}.`);
+  }
+  return { from, to };
+}
+
+/** Parses argv without the node and script entries; `today` sets the default ranges. */
 export function parseCliArgs(argv: string[], today: Date): CliArgs {
   let parsed;
   try {
@@ -126,13 +142,12 @@ export function parseCliArgs(argv: string[], today: Date): CliArgs {
       return { command: { name, notify: values.notify ?? false }, debug };
     case 'status':
       return { command: { name, json: values.json ?? false }, debug };
-    case 'sync': {
-      const from = parseDate(values.from ?? localDate(addDays(today, -14)), '--from');
-      const to = parseDate(values.to ?? localDate(today), '--to');
-      if (from > to) {
-        throw new UsageError(`--from ${from} is after --to ${to}.`);
-      }
-      return { command: { name, from, to }, debug };
+    case 'sync':
+      return { command: { name, ...parseRange(values, localDate(addDays(today, -14)), localDate(today)) }, debug };
+    case 'meetings': {
+      // A single --from shows that day only.
+      const range = parseRange(values, localDate(today), values.from ?? localDate(today));
+      return { command: { name, ...range, json: values.json ?? false }, debug };
     }
     case 'correct': {
       const [date, direction, time] = rest;

@@ -68,19 +68,20 @@ Make it executable (`chmod +x`). The widget runs `timebooking` from `plasmashell
 ### After either setup
 
 1. Store the GFOS password, and the calendar feed URL if you use `get_meetings` (see [Configuration](#configuration)).
-2. Check the GFOS access: `timebooking status` prints the clock state and today's net working time.
+2. Check the GFOS access: `timebooking status` prints the clock state and today's net working time. Check the calendar feed: `timebooking meetings` lists today's entries.
 3. Optional: register the MCP server with your MCP client (see [MCP server](#mcp-server)); for Claude Code: `claude mcp add --scope user timebooking -- timebooking mcp`.
 
 ## CLI
 
-| Command                                                         | Purpose                                             |
-| --------------------------------------------------------------- | --------------------------------------------------- |
-| `timebooking clock-in [--notify]`                               | Stamp clock-in                                      |
-| `timebooking clock-out [--notify]`                              | Stamp clock-out                                     |
-| `timebooking status [--json]`                                   | Show the clock state and today's net working time   |
-| `timebooking sync [--from DATE] [--to DATE]`                    | Backfill punches from GFOS into the local stamp log |
-| `timebooking correct <DATE> <in\|out> <HH:MM> [--comment TEXT]` | Request a correction of a missing or wrong punch    |
-| `timebooking mcp`                                               | Start the MCP server on stdio                       |
+| Command                                                         | Purpose                                                                 |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `timebooking clock-in [--notify]`                               | Stamp clock-in                                                          |
+| `timebooking clock-out [--notify]`                              | Stamp clock-out                                                         |
+| `timebooking status [--json]`                                   | Show the clock state and today's net working time                       |
+| `timebooking sync [--from DATE] [--to DATE]`                    | Backfill punches from GFOS into the local stamp log                     |
+| `timebooking correct <DATE> <in\|out> <HH:MM> [--comment TEXT]` | Request a correction of a missing or wrong punch                        |
+| `timebooking meetings [--from DATE] [--to DATE] [--json]`       | List calendar entries from the ICS feed (default: today); no VPN needed |
+| `timebooking mcp`                                               | Start the MCP server on stdio                                           |
 
 `timebooking --help` lists all options.
 

@@ -71,3 +71,24 @@ test('rejects unknown commands, unknown options and options of other commands', 
   assert.throws(() => parse('clock-in', '--json'), UsageError);
   assert.throws(() => parse('status', 'extra'), UsageError);
 });
+
+test('meetings defaults to today, a single --from shows that day', () => {
+  assert.deepEqual(parse('meetings').command, { name: 'meetings', from: '2026-11-10', to: '2026-11-10', json: false });
+  assert.deepEqual(parse('meetings', '--from', '2026-11-03').command, {
+    name: 'meetings',
+    from: '2026-11-03',
+    to: '2026-11-03',
+    json: false,
+  });
+});
+
+test('meetings with range and --json', () => {
+  assert.deepEqual(parse('meetings', '--from', '2026-11-02', '--to', '2026-11-06', '--json').command, {
+    name: 'meetings',
+    from: '2026-11-02',
+    to: '2026-11-06',
+    json: true,
+  });
+  assert.throws(() => parse('meetings', '--from', '2026-11-06', '--to', '2026-11-02'), UsageError);
+  assert.throws(() => parse('meetings', '--notify'), UsageError);
+});
