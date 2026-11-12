@@ -9,7 +9,7 @@ CLI, MCP server and KDE Plasma widget for the [gfos.Workforce](https://www.gfos.
 - Linux with a Secret Service provider (KeePassXC with Secret Service integration, GNOME Keyring or KWallet) and `secret-tool` (libsecret) for the passwords.
 - Network access to GFOS (often VPN only) for the GFOS commands and tools. The calendar feed does not go through GFOS.
 - Optional: `notify-send` (libnotify) for `--notify`, KDE Plasma 6 for the widget.
-- Manual setup only: Node.js 22 and npm.
+- Manual setup only: Node.js 22 and pnpm. npm is refused.
 
 ### With Nix (flake and Home Manager)
 
@@ -42,7 +42,7 @@ inputs.timebooking-tools = {
 
 The module installs the `timebooking` binary, wrapped with the account settings (so the widget sees them too, without session variables), and the Plasma widget. After switching, add "Timebooking" to a panel. To update, run `nix flake update timebooking-tools` and switch again.
 
-For development, `nix develop` provides Node.js 22; the commands are listed in `AGENTS.md`.
+For development, `nix develop` provides Node.js 22 and pnpm; the commands are listed in `AGENTS.md`.
 
 Without Home Manager, `nix run github:daniel-leib-fnt/timebooking-tools -- status` runs the CLI directly; set the variables from [Configuration](#configuration) yourself.
 
@@ -51,12 +51,19 @@ Without Home Manager, `nix run github:daniel-leib-fnt/timebooking-tools -- statu
 ```bash
 git clone https://github.com/daniel-leib-fnt/timebooking-tools.git
 cd timebooking-tools
-npm ci
-npm run build
-npm link            # puts `timebooking` (dist/cli/main.js) on the PATH
+pnpm install --frozen-lockfile
+pnpm build
 ```
 
-Set the variables from [Configuration](#configuration) in your shell profile. The widget runs `timebooking` from `plasmashell`, which does not read shell profiles: either put a wrapper script on the session `PATH` that exports the variables and runs `dist/cli/main.js`, or set them in `~/.config/environment.d/timebooking.conf` and log in again. Install the widget with `kpackagetool6 -t Plasma/Applet -i plasmoid` (see `plasmoid/README.md`).
+Put a wrapper on your `PATH`, e.g. `~/.local/bin/timebooking`, that sets the variables from [Configuration](#configuration) and starts the CLI:
+
+```bash
+#!/bin/sh
+export GFOS_URL=https://gfos.example.com/gfos GFOS_MANDANT=EXAMPLE GFOS_ORG_EINHEIT=D GFOS_PERSONALNUMMER=12345
+exec node /path/to/timebooking-tools/dist/cli/main.js "$@"
+```
+
+Make it executable (`chmod +x`). The widget runs `timebooking` from `plasmashell`, which does not read shell profiles, so the wrapper must be on the session `PATH` and carry the variables itself. Install the widget with `kpackagetool6 -t Plasma/Applet -i plasmoid` (see `plasmoid/README.md`).
 
 ### After either setup
 

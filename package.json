@@ -26,5 +26,9 @@
     "@types/proper-lockfile": "^4.1.4",
     "prettier": "3.9.10",
     "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=22",
+    "npm": "nope, use pnpm"
   }
 }

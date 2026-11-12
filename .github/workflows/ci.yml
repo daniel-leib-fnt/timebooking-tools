@@ -9,11 +9,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run format:check
-      - run: npm test
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+
+      - name: Check the code style and test
+        run: nix develop -c bash -c 'pnpm install --frozen-lockfile && pnpm format:check && pnpm test'
+
+      # Builds the CLI package, which also checks the fetchPnpmDeps hash, and the widget.
+      - name: Build
+        run: nix build -L .#default .#plasmoid

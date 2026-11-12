@@ -1,5 +1,5 @@
 <!-- FOR AI AGENTS - Human readability is a side effect, not a goal -->
-<!-- Last updated: 2026-11-10 | Last verified: 2026-11-10 -->
+<!-- Last updated: 2026-11-12 | Last verified: 2026-11-12 -->
 
 # AGENTS.md
 
@@ -24,24 +24,24 @@ Everything committed here is world-readable, including the git history. Rewritin
 
 ## Commands
 
-Node is not on the system PATH; use the dev shell (`nix develop`) or prefix with `nix shell nixpkgs#nodejs_22 -c`.
+Node and pnpm are not on the system PATH; use the dev shell (`nix develop`) or prefix with `nix develop -c`. Dependencies are managed with pnpm only; npm refuses to install (`engines`, `.npmrc`).
 
-| Task          | Command                                                     |
-| ------------- | ----------------------------------------------------------- |
-| Install       | `npm install`                                               |
-| Build         | `npm run build` (tsc → `dist/`)                             |
-| Typecheck     | `npx tsc --noEmit`                                          |
-| Test (all)    | `npm test` (builds, then `node --test 'dist/**/*.test.js'`) |
-| Test (single) | `npx tsc && node --test dist/gfos/zeitkonto.test.js`        |
-| Format        | `npm run format` (prettier, config in `.prettierrc.json`)   |
-| Format check  | `npm run format:check`                                      |
-| Nix package   | `nix build .#default`, `nix build .#plasmoid`               |
+| Task          | Command                                                      |
+| ------------- | ------------------------------------------------------------ |
+| Install       | `pnpm install`                                               |
+| Build         | `pnpm build` (tsc → `dist/`)                                 |
+| Typecheck     | `pnpm exec tsc --noEmit`                                     |
+| Test (all)    | `pnpm test` (builds, then `node --test 'dist/**/*.test.js'`) |
+| Test (single) | `pnpm exec tsc && node --test dist/gfos/zeitkonto.test.js`   |
+| Format        | `pnpm format` (prettier, config in `.prettierrc.json`)       |
+| Format check  | `pnpm format:check`                                          |
+| Nix package   | `nix build .#default`, `nix build .#plasmoid`                |
 
-CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run format:check` and `npm test` on every push to `main` and every pull request. There is no linter. Tests run from `dist/`; fixtures are read from `src/gfos/fixtures/`.
+CI (`.github/workflows/ci.yml`) runs `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm test` and `nix build` through the dev shell on every push to `main` and every pull request. There is no linter. Tests run from `dist/`; fixtures are read from `src/gfos/fixtures/`.
 
 `.prettierignore` excludes the fixtures (parser input, must stay byte-identical to the captured structure) and `plasmoid/contents/ui/worktime.js` (QML JavaScript with `.pragma library`, which prettier cannot parse).
 
-When `package-lock.json` changes, update `npmDepsHash` in `nix/package.nix` (`nix shell nixpkgs#prefetch-npm-deps -c prefetch-npm-deps package-lock.json`).
+`pnpm-workspace.yaml` holds the supply-chain rules: no package version younger than 7 days (`minimumReleaseAge`), install scripts only for packages listed under `allowBuilds` (`strictDepBuilds`, currently none), strict engines. Do not loosen them without asking. When `pnpm-lock.yaml` changes, update the `fetchPnpmDeps` `hash` in `nix/package.nix` (set it to `lib.fakeHash`, run `nix build`, take the hash from the error).
 
 ## File Map
 
@@ -70,8 +70,8 @@ nix/            package, plasmoid and Home Manager module (programs.timebooking)
 
 ### Always
 
-- Add or update tests for parser and worktime changes; show `npm test` output before claiming done. A break rule change goes into both `src/worktime.ts` and `plasmoid/contents/ui/worktime.js`; `src/worktime-plasmoid.test.ts` compares them.
-- Run `npm run format` before committing; CI fails on unformatted files.
+- Add or update tests for parser and worktime changes; show `pnpm test` output before claiming done. A break rule change goes into both `src/worktime.ts` and `plasmoid/contents/ui/worktime.js`; `src/worktime-plasmoid.test.ts` compares them.
+- Run `pnpm format` before committing; CI fails on unformatted files.
 - Conventional Commits: `type(scope): subject`.
 - Testing the widget or CLI manually: use a throwaway `XDG_STATE_HOME` and a fake `timebooking` (see `plasmoid/README.md`), so the real attendance record is never touched.
 
