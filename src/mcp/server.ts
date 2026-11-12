@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { fetchMeetings } from '../calendar/index.js';
 import { createGfosClient, GfosDay, GfosUnreachableError } from '../gfos/index.js';
 
 // Read-only on purpose: stamping and corrections change the attendance record and stay CLI-only.
@@ -91,6 +92,19 @@ export async function startMcpServer(): Promise<void> {
         return (await client.getDays(startDate, endDate)).filter((day) => hasIssue(day, today));
       });
     },
+  );
+
+  server.registerTool(
+    'get_meetings',
+    {
+      description:
+        'Fetch the calendar entries of a date range from the published ICS feed, recurrences expanded, in local time: ' +
+        'start, end, all-day flag, summary, status (TENTATIVE, CANCELLED), Outlook busy status (BUSY, TENTATIVE, FREE, OOF), ' +
+        'transparency, organizer and the start of the description. Does not need the VPN.',
+      inputSchema: dateRangeSchema,
+    },
+    async ({ startDate, endDate }) =>
+      startDate > endDate ? errorResult('startDate must be before or equal to endDate.') : runTool(() => fetchMeetings(startDate, endDate)),
   );
 
   await server.connect(new StdioServerTransport());

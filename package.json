@@ -16,6 +16,7 @@
     "axios": "^1.7.0",
     "axios-cookiejar-support": "^7.0.0",
     "cheerio": "^1.0.0",
+    "ical.js": "^2.2.1",
     "proper-lockfile": "^4.1.2",
     "tough-cookie": "^6.0.1",
     "zod": "^3.23.0"

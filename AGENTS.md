@@ -47,6 +47,7 @@ When `package-lock.json` changes, update `npmDepsHash` in `nix/package.nix` (`ni
 
 ```
 src/gfos/       shared GFOS library (session, login, Zeitkonto parser, stamp/correction actions); public contract in types.ts
+src/calendar/   calendar entries from a published ICS feed, recurrences expanded (ical.js)
 src/cli/        `timebooking` CLI (args, commands, local state files)
 src/mcp/        MCP server on stdio (`timebooking mcp`), read-only tools
 src/worktime.ts net working time incl. German break rule (ArbZG §4)
@@ -63,6 +64,7 @@ nix/            package, plasmoid and Home Manager module (programs.timebooking)
 - The widget never stamps on a panel click: stamping needs the popup button and a state GFOS confirmed within the last minute, because GFOS stamps alternate and a stale state sends the wrong direction.
 - The Zeitkonto shows a stamp only 6 to 16 s after it was made; after a confirmed stamp the CLI applies the punch itself (`applyPunch` in `src/cli/commands.ts`).
 - Account settings come from environment variables (`GFOS_URL`, `GFOS_MANDANT`, `GFOS_ORG_EINHEIT`, `GFOS_PERSONALNUMMER`); the password comes from the Secret Service (`service=gfos`), `GFOS_PASSWORT` is only a fallback.
+- The calendar feed URL carries a secret token: it comes from the Secret Service (`service=calendar-ics`), `CALENDAR_ICS_URL` is only a fallback. The calendar does not go through GFOS and does not need the VPN.
 
 ## Boundaries
 

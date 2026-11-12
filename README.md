@@ -40,6 +40,14 @@ The password is looked up with `secret-tool lookup service gfos`. Store it once:
 secret-tool store --label='GFOS' service gfos
 ```
 
+`get_meetings` reads a published calendar feed (for example Outlook's "Publish calendar" ICS link). The URL contains a secret token, so it is looked up with `secret-tool lookup service calendar-ics`, with `CALENDAR_ICS_URL` as the fallback:
+
+```bash
+secret-tool store --label='Calendar ICS' service calendar-ics
+```
+
+Times are returned in the local time zone of the process (`TZ`).
+
 The GFOS session is persisted in `$XDG_STATE_HOME/timebooking/session.json` and reused until it expires. GFOS is only reachable over the VPN.
 
 ## MCP server
@@ -62,6 +70,7 @@ The tools are read-only. Clocking in and out and corrections stay CLI-only becau
 | `get_days`        | `startDate`, `endDate` (`YYYY-MM-DD`, inclusive) | One entry per day: type, clock-in/clock-out intervals, actual and target hours, balances, absence reason, GFOS notes |
 | `get_clock_state` | none                                             | `clockedIn`, `since`, and today's day                                                                                |
 | `get_issues`      | `startDate`, `endDate`                           | Only days that need a correction: days with GFOS notes (e.g. missing clock-out) and past days with an open interval  |
+| `get_meetings`    | `startDate`, `endDate`                           | Calendar entries from the ICS feed, recurrences expanded: times, summary, status, busy status, organizer             |
 
 ## Plasma widget
 
