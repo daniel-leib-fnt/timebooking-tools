@@ -23,14 +23,15 @@ test('status --json', () => {
 });
 
 test('sync defaults to the last 14 days', () => {
-  assert.deepEqual(parse('sync').command, { name: 'sync', from: '2026-10-27', to: '2026-11-10' });
+  assert.deepEqual(parse('sync').command, { name: 'sync', from: '2026-10-27', to: '2026-11-10', refresh: false });
 });
 
 test('sync with explicit range', () => {
-  assert.deepEqual(parse('sync', '--from', '2026-01-01', '--to', '2026-01-31').command, {
+  assert.deepEqual(parse('sync', '--from', '2026-01-01', '--to', '2026-01-31', '--refresh').command, {
     name: 'sync',
     from: '2026-01-01',
     to: '2026-01-31',
+    refresh: true,
   });
 });
 
@@ -91,4 +92,19 @@ test('meetings with range and --json', () => {
   });
   assert.throws(() => parse('meetings', '--from', '2026-11-06', '--to', '2026-11-02'), UsageError);
   assert.throws(() => parse('meetings', '--notify'), UsageError);
+});
+
+test('days defaults to today without refresh', () => {
+  assert.deepEqual(parse('days').command, { name: 'days', from: '2026-11-10', to: '2026-11-10', json: false, refresh: false });
+});
+
+test('days with range, --json and --refresh', () => {
+  assert.deepEqual(parse('days', '--from', '2026-11-02', '--to', '2026-11-06', '--json', '--refresh').command, {
+    name: 'days',
+    from: '2026-11-02',
+    to: '2026-11-06',
+    json: true,
+    refresh: true,
+  });
+  assert.throws(() => parse('status', '--refresh'), UsageError);
 });

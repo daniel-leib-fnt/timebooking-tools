@@ -308,7 +308,7 @@ function toUnreachableError(error: unknown, baseUrl: string): GfosUnreachableErr
   return new GfosUnreachableError(`GFOS at ${new URL(baseUrl).host} is not reachable (${code}). Is the VPN connected?`, { cause: error });
 }
 
-function stateDir(): string {
+export function stateDir(): string {
   return join(process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state'), 'timebooking');
 }
 

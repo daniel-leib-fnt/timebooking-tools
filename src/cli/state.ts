@@ -1,8 +1,7 @@
-import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { StampDirection } from '../gfos/types';
-import { StatusFile } from '../status';
 
 export interface StampLogEntry {
   /** ISO 8601 date-time of the log write. */
@@ -25,33 +24,8 @@ function stateDir(): string {
   return join(process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state'), 'timebooking');
 }
 
-export function statusFilePath(): string {
-  return join(stateDir(), 'status.json');
-}
-
 export function stampLogPath(): string {
   return process.env.TIMEBOOKING_STAMP_LOG || join(stateDir(), 'stamps.jsonl');
-}
-
-/** Returns null when no status file has been written yet. */
-export async function readStatusFile(): Promise<StatusFile | null> {
-  try {
-    return JSON.parse(await readFile(statusFilePath(), 'utf8')) as StatusFile;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
-}
-
-/** Atomic: the widget never sees a half-written file. */
-export async function writeStatusFile(status: StatusFile): Promise<void> {
-  const path = statusFilePath();
-  const tmp = `${path}.${process.pid}.tmp`;
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(tmp, JSON.stringify(status, null, 2) + '\n');
-  await rename(tmp, path);
 }
 
 export async function readStampLog(): Promise<StampLogEntry[]> {

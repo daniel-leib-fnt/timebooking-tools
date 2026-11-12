@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyPunch, notificationTexts } from './commands';
+import { applyPunch } from '../gfos/cache';
+import { notificationTexts } from './commands';
 
 const morning = { in: '08:00', out: '12:00' };
 

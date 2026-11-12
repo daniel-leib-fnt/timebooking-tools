@@ -11,7 +11,8 @@ import "worktime.js" as Worktime
 PlasmoidItem {
     id: root
 
-    readonly property string statusCommand: 'cat "${XDG_STATE_HOME:-$HOME/.local/state}/timebooking/status.json"'
+    // The CLI caches the GFOS days per year; today is in the current year's file.
+    readonly property string cacheCommand: 'cat "${XDG_STATE_HOME:-$HOME/.local/state}/timebooking/days/$(date +%Y).json"'
 
     readonly property var texts: Qt.locale().name.startsWith("de") ? {
         clockIn: "Einstempeln",
@@ -21,8 +22,7 @@ PlasmoidItem {
         noBookings: "Heute keine Buchungen",
         lastUpdate: "Letzte Aktualisierung",
         checking: "Prüfe Status bei GFOS …",
-        statusUnreadable: "Statusdatei nicht lesbar",
-        notConfirmed: "Nicht von GFOS bestätigt (lokaler Stand)",
+        statusUnreadable: "Noch keine Daten von GFOS – Popup öffnen",
         refresh: "Von GFOS aktualisieren"
     } : {
         clockIn: "Clock in",
@@ -32,34 +32,33 @@ PlasmoidItem {
         noBookings: "No bookings today",
         lastUpdate: "Last update",
         checking: "Checking status at GFOS …",
-        statusUnreadable: "Status file not readable",
-        notConfirmed: "Not confirmed by GFOS (local state)",
+        statusUnreadable: "No data from GFOS yet – open the popup",
         refresh: "Refresh from GFOS"
     }
 
-    // Parsed status.json; null until the first successful read.
-    property var status: null
+    // Parsed days/<yyyy>.json; null until the first successful read.
+    property var cache: null
     property bool busy: false
     property bool refreshing: false
     property string actionError: ""
     property date now: new Date()
 
-    readonly property bool isToday: status !== null && status.date === Qt.formatDate(now, "yyyy-MM-dd")
-    readonly property bool clockedIn: isToday && status.clockedIn
-    readonly property var intervals: isToday ? status.intervals : []
+    readonly property var today: cache !== null ? cache.days[Qt.formatDate(now, "yyyy-MM-dd")] ?? null : null
+    readonly property var intervals: today !== null && today.day !== null ? today.day.intervals : []
+    readonly property bool clockedIn: intervals.length > 0 && intervals[intervals.length - 1].out === null
+    readonly property string lastError: cache !== null && cache.lastError ? cache.lastError.message : ""
     readonly property bool stampedToday: intervals.length > 0
     readonly property string netText: stampedToday ? Worktime.format(Worktime.netSeconds(intervals, now)) : "-:--"
     readonly property color netColor: !stampedToday ? "#000000" : clockedIn ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
     readonly property string warning: {
         if (actionError) return actionError;
-        if (status === null) return texts.statusUnreadable;
-        if (status.lastError) return status.lastError;
-        if (status.source === "local") return texts.notConfirmed;
+        if (lastError) return lastError;
+        if (today === null) return texts.statusUnreadable;
         return "";
     }
     // Stamping needs a state GFOS confirmed within the last minute: a stale state sends the wrong direction.
-    readonly property bool fresh: status !== null && status.source === "gfos" && !status.lastError
-        && now - new Date(status.updatedAt) < 60 * 1000
+    // A "local" entry holds a punch GFOS confirmed, so it counts as fresh as well.
+    readonly property bool fresh: today !== null && !lastError && now - new Date(today.fetchedAt) < 60 * 1000
     readonly property bool canStamp: !busy && !refreshing && fresh
 
     function intervalLines() {
@@ -74,25 +73,30 @@ PlasmoidItem {
         executable.connectSource(command);
     }
 
-    function readStatus() {
-        run(statusCommand, (code, stdout) => {
+    function readCache() {
+        run(cacheCommand, (code, stdout) => {
             if (code !== 0) {
-                status = null;
+                cache = null;
                 return;
             }
             try {
-                status = JSON.parse(stdout);
+                cache = JSON.parse(stdout);
             } catch (e) {
-                status = null;
+                cache = null;
             }
         });
     }
 
+    // Reads today from GFOS into the cache; stdout is not used, only the error.
     function refreshFromGfos() {
         refreshing = true;
-        run("timebooking status --json", () => {
+        actionError = "";
+        run("timebooking status", (code, stdout, stderr) => {
             refreshing = false;
-            readStatus();
+            if (code !== 0) {
+                actionError = (stderr || ("exit code " + code)).trim();
+            }
+            readCache();
         });
     }
 
@@ -105,13 +109,13 @@ PlasmoidItem {
             if (code !== 0) {
                 actionError = (stderr || stdout || ("exit code " + code)).trim();
             }
-            readStatus();
+            readCache();
         });
     }
 
+    // GFOS is only contacted when the popup opens, from the context menu and when stamping.
     onExpandedChanged: {
         if (expanded) {
-            actionError = "";
             refreshFromGfos();
         }
     }
@@ -133,21 +137,13 @@ PlasmoidItem {
         repeat: true
         onTriggered: root.now = new Date()
     }
-    // The CLI writes status.json on every call, also from the console; reading it is cheap.
+    // Every CLI and MCP call that reads GFOS updates the cache file, also from the console.
     Timer {
-        interval: 5 * 1000
+        interval: 10 * 1000
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: root.readStatus()
-    }
-    // Retries sooner while the last refresh failed, e.g. until the VPN is connected.
-    Timer {
-        interval: root.status !== null && root.status.lastError ? 30 * 1000 : 5 * 60 * 1000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: root.refreshFromGfos()
+        onTriggered: root.readCache()
     }
 
     Plasmoid.icon: "chronometer"
@@ -155,7 +151,7 @@ PlasmoidItem {
     toolTipMainText: (clockedIn ? texts.clockedIn : texts.notClockedIn) + " – " + netText
     toolTipSubText: {
         let text = intervalLines();
-        if (status !== null) text += "\n\n" + texts.lastUpdate + ": " + Qt.formatTime(new Date(status.updatedAt), "HH:mm:ss");
+        if (today !== null) text += "\n\n" + texts.lastUpdate + ": " + Qt.formatTime(new Date(today.fetchedAt), "HH:mm:ss");
         if (warning) text += "\n\n⚠ " + warning;
         return text;
     }

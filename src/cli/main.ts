@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { createGfosClient } from '../gfos';
+import { CachedGfosClient, createGfosClient } from '../gfos';
 import { GfosClient, GfosClientOptions, GfosUnreachableError } from '../gfos/types';
 import { CliArgs, HELP, parseCliArgs, UsageError } from './args';
-import { correct, describeError, stamp, status, sync } from './commands';
+import { correct, days, describeError, stamp, status, sync } from './commands';
 import { meetings } from './meetings';
 
 /** `createClient` is a parameter so a fake client can be injected for manual testing. */
@@ -41,7 +41,7 @@ export async function run(argv: string[], createClient: (options: GfosClientOpti
   }
 
   try {
-    const client = createClient({ debug: args.debug });
+    const client = new CachedGfosClient(createClient({ debug: args.debug }));
     switch (command.name) {
       case 'clock-in':
         await stamp(client, 'in', { notify: command.notify });
@@ -54,6 +54,9 @@ export async function run(argv: string[], createClient: (options: GfosClientOpti
         break;
       case 'sync':
         await sync(client, command);
+        break;
+      case 'days':
+        await days(client, command, { json: command.json });
         break;
       case 'correct':
         await correct(client, command.request);

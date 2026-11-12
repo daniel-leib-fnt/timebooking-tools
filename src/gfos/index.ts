@@ -1,4 +1,5 @@
 export * from './types';
+export * from './cache';
 import { requestCorrection, stamp } from './actions';
 import { withSession } from './session';
 import { ClockState, GfosClient, GfosClientOptions } from './types';

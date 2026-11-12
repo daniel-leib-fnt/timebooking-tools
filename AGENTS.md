@@ -16,7 +16,7 @@ Everything committed here is world-readable, including the git history. Rewritin
 | Personalnummer, Mandant/Werk of a real account in examples                                                 | `12345`, generic examples                                                                                          |
 | Internal hostnames, IPs, VPN details, the employer's GFOS URL                                              | `https://gfos.example.com/gfos`; the URL is configured via `GFOS_URL`, there is no default                         |
 | Passwords, session files (`session.json`), cookies, `PARAM` or `ViewState` tokens                          | Secret Service (`secret-tool`), `$XDG_STATE_HOME/timebooking/` (outside the repo)                                  |
-| Stamp logs (`stamps.jsonl`), `status.json`, `--debug` output                                               | Hand-written samples                                                                                               |
+| Stamp logs (`stamps.jsonl`), the day cache (`days/*.json`), `--debug` output                               | Hand-written samples                                                                                               |
 | Personal paths (`/home/<user>/…`), private emails, ticket keys                                             | Relative paths, placeholders                                                                                       |
 
 - Before committing, review `git diff --cached` for the items above. A new fixture from GFOS must be scrubbed first; state that its values are synthetic in its header comment.
@@ -46,12 +46,11 @@ CI (`.github/workflows/ci.yml`) runs `pnpm install --frozen-lockfile`, `pnpm for
 ## File Map
 
 ```
-src/gfos/       shared GFOS library (session, login, Zeitkonto parser, stamp/correction actions); public contract in types.ts
+src/gfos/       shared GFOS library (session, login, Zeitkonto parser, stamp/correction actions, day cache in cache.ts); public contract in types.ts
 src/calendar/   calendar entries from a published ICS feed, recurrences expanded (ical.js)
 src/cli/        `timebooking` CLI (args, commands, local state files)
 src/mcp/        MCP server on stdio (`timebooking mcp`), read-only tools
 src/worktime.ts net working time incl. German break rule (ArbZG §4)
-src/status.ts   status file format shared with the widget
 plasmoid/       KDE Plasma 6 widget (QML); talks only to the CLI, never to GFOS
 nix/            package, plasmoid and Home Manager module (programs.timebooking)
 ```
@@ -60,7 +59,8 @@ nix/            package, plasmoid and Home Manager module (programs.timebooking)
 
 - CLI and MCP server are thin entry points over `src/gfos/`; GFOS logic belongs in the library.
 - MCP tools are read-only. Clock-in/out and correction requests stay CLI-only, because they change the attendance record.
-- The widget never contacts GFOS; it runs `timebooking` and reads `status.json`.
+- GFOS days are cached per year in `$XDG_STATE_HOME/timebooking/days/<yyyy>.json` (`src/gfos/cache.ts`, used by the CLI and the MCP server). GFOS is read for today, days not final yet (read before they ended, notes, open interval), `--refresh`/`refresh` and `TIMEBOOKING_ALWAYS_REFRESH=1`; per whole month, because a month costs the same as one day. When GFOS fails, the cache answers with `stale` days and exit code 2; `--refresh` fails instead.
+- The widget never contacts GFOS; it runs `timebooking` and reads the current year's day cache file every 10 s. It calls GFOS only when the popup opens, from the context menu and when stamping; there is no periodic refresh.
 - The widget never stamps on a panel click: stamping needs the popup button and a state GFOS confirmed within the last minute, because GFOS stamps alternate and a stale state sends the wrong direction.
 - The Zeitkonto shows a stamp only 6 to 16 s after it was made; after a confirmed stamp the CLI applies the punch itself (`applyPunch` in `src/cli/commands.ts`).
 - Account settings come from environment variables (`GFOS_URL`, `GFOS_MANDANT`, `GFOS_ORG_EINHEIT`, `GFOS_PERSONALNUMMER`); the password comes from the Secret Service (`service=gfos`), `GFOS_PASSWORT` is only a fallback.

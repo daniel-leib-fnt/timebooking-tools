@@ -36,6 +36,7 @@ inputs.timebooking-tools = {
     orgEinheit = "D";
     personalnummer = "12345";
     # stampLog = "/path/to/stamps.jsonl"; # default: $XDG_STATE_HOME/timebooking/stamps.jsonl
+    # alwaysRefresh = true; # read every day from GFOS instead of the day cache (see "Day cache")
   };
 }
 ```
@@ -73,27 +74,29 @@ Make it executable (`chmod +x`). The widget runs `timebooking` from `plasmashell
 
 ## CLI
 
-| Command                                                         | Purpose                                                                 |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `timebooking clock-in [--notify]`                               | Stamp clock-in                                                          |
-| `timebooking clock-out [--notify]`                              | Stamp clock-out                                                         |
-| `timebooking status [--json]`                                   | Show the clock state and today's net working time                       |
-| `timebooking sync [--from DATE] [--to DATE]`                    | Backfill punches from GFOS into the local stamp log                     |
-| `timebooking correct <DATE> <in\|out> <HH:MM> [--comment TEXT]` | Request a correction of a missing or wrong punch                        |
-| `timebooking meetings [--from DATE] [--to DATE] [--json]`       | List calendar entries from the ICS feed (default: today); no VPN needed |
-| `timebooking mcp`                                               | Start the MCP server on stdio                                           |
+| Command                                                           | Purpose                                                                      |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `timebooking clock-in [--notify]`                                 | Stamp clock-in                                                               |
+| `timebooking clock-out [--notify]`                                | Stamp clock-out                                                              |
+| `timebooking status [--json]`                                     | Show the clock state and today's net working time                            |
+| `timebooking sync [--from DATE] [--to DATE] [--refresh]`          | Backfill punches from GFOS into the local stamp log                          |
+| `timebooking days [--from DATE] [--to DATE] [--json] [--refresh]` | Show the GFOS days (default: today): punches, Ist, absence, notes, when read |
+| `timebooking correct <DATE> <in\|out> <HH:MM> [--comment TEXT]`   | Request a correction of a missing or wrong punch                             |
+| `timebooking meetings [--from DATE] [--to DATE] [--json]`         | List calendar entries from the ICS feed (default: today); no VPN needed      |
+| `timebooking mcp`                                                 | Start the MCP server on stdio                                                |
 
 `timebooking --help` lists all options.
 
 ## Configuration
 
-| Variable              | Description                                                                |
-| --------------------- | -------------------------------------------------------------------------- |
-| `GFOS_URL`            | Base URL of the GFOS web application, e.g. `https://gfos.example.com/gfos` |
-| `GFOS_MANDANT`        | Mandant, e.g. `FNT`                                                        |
-| `GFOS_ORG_EINHEIT`    | OrgEinheit / Werk, e.g. `D`                                                |
-| `GFOS_PERSONALNUMMER` | Personalnummer, e.g. `12345`                                               |
-| `GFOS_PASSWORT`       | Password; fallback when the Secret Service has none                        |
+| Variable                     | Description                                                                             |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| `GFOS_URL`                   | Base URL of the GFOS web application, e.g. `https://gfos.example.com/gfos`              |
+| `GFOS_MANDANT`               | Mandant, e.g. `FNT`                                                                     |
+| `GFOS_ORG_EINHEIT`           | OrgEinheit / Werk, e.g. `D`                                                             |
+| `GFOS_PERSONALNUMMER`        | Personalnummer, e.g. `12345`                                                            |
+| `GFOS_PASSWORT`              | Password; fallback when the Secret Service has none                                     |
+| `TIMEBOOKING_ALWAYS_REFRESH` | `1`: read every requested day from GFOS instead of the day cache (Nix: `alwaysRefresh`) |
 
 The password is looked up with `secret-tool lookup service gfos`. Store it once:
 
@@ -111,6 +114,17 @@ Times are returned in the local time zone of the process (`TZ`).
 
 The GFOS session is persisted in `$XDG_STATE_HOME/timebooking/session.json` and reused until it expires. GFOS is only reachable over the VPN.
 
+## Day cache
+
+Every day read from GFOS (by the CLI, the MCP server, and clock-in or clock-out) is cached in `$XDG_STATE_HOME/timebooking/days/<yyyy>.json`, one file per year, so past days can be read without the VPN. The widget reads today from the same file.
+
+- GFOS is contacted for today, for days that are not final yet, with `--refresh` (MCP: `refresh: true`), and for every day when `TIMEBOOKING_ALWAYS_REFRESH=1`. A day is final when it was read after it ended and has neither GFOS notes nor an open interval.
+- GFOS answers per calendar month, and a month costs the same whether one day or all are read, so a month with one missing day is read as a whole.
+- Every day carries `fetchedAt`. Balances (`balanceTotal`) are a snapshot of that time.
+- When GFOS is not reachable, the cached data is returned, days that needed GFOS are marked `stale`, the error goes to stderr (MCP: a warning before the data), and the exit code is 2. It fails without data only when a past day was never cached, and always with `--refresh`.
+- Today is `source: "local"` while a punch GFOS confirmed is not visible in the Zeitkonto yet (it shows up after 5 to 15 seconds).
+- A missing or unreadable file counts as empty and is rewritten.
+
 ## MCP server
 
 ```json
@@ -124,14 +138,14 @@ The GFOS session is persisted in `$XDG_STATE_HOME/timebooking/session.json` and 
 }
 ```
 
-The tools are read-only. Clocking in and out and corrections stay CLI-only because they change the attendance record.
+The tools are read-only. Clocking in and out and corrections stay CLI-only because they change the attendance record. `get_days`, `get_issues` and `get_clock_state` follow the rules of the [day cache](#day-cache).
 
-| Tool              | Input                                            | Returns                                                                                                              |
-| ----------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `get_days`        | `startDate`, `endDate` (`YYYY-MM-DD`, inclusive) | One entry per day: type, clock-in/clock-out intervals, actual and target hours, balances, absence reason, GFOS notes |
-| `get_clock_state` | none                                             | `clockedIn`, `since`, and today's day                                                                                |
-| `get_issues`      | `startDate`, `endDate`                           | Only days that need a correction: days with GFOS notes (e.g. missing clock-out) and past days with an open interval  |
-| `get_meetings`    | `startDate`, `endDate`                           | Calendar entries from the ICS feed, recurrences expanded: times, summary, status, busy status, organizer             |
+| Tool              | Input                                                                | Returns                                                                                                                                                              |
+| ----------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_days`        | `startDate`, `endDate` (`YYYY-MM-DD`, inclusive), optional `refresh` | One entry per day with a GFOS row: type, clock-in/clock-out intervals, actual and target hours, balances, absence reason, GFOS notes, `fetchedAt`, `source`, `stale` |
+| `get_clock_state` | none                                                                 | `clockedIn`, `since`, today's day, `fetchedAt`, `source`, `lastError`, `stale`                                                                                       |
+| `get_issues`      | `startDate`, `endDate`, optional `refresh`                           | Only days that need a correction: days with GFOS notes (e.g. missing clock-out) and past days with an open interval                                                  |
+| `get_meetings`    | `startDate`, `endDate`                                               | Calendar entries from the ICS feed, recurrences expanded: times, summary, status, busy status, organizer                                                             |
 
 ## Plasma widget
 

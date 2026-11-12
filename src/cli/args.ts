@@ -5,7 +5,8 @@ import { addDays, localDate } from './dates';
 export type Command =
   | { name: 'clock-in' | 'clock-out'; notify: boolean }
   | { name: 'status'; json: boolean }
-  | { name: 'sync'; from: string; to: string }
+  | { name: 'sync'; from: string; to: string; refresh: boolean }
+  | { name: 'days'; from: string; to: string; json: boolean; refresh: boolean }
   | { name: 'meetings'; from: string; to: string; json: boolean }
   | { name: 'correct'; request: CorrectionRequest }
   | { name: 'mcp' }
@@ -29,7 +30,10 @@ Commands:
   clock-in [--notify]             Stamp "in" in GFOS
   clock-out [--notify]            Stamp "out" in GFOS
   status [--json]                 Show the current clock state and today's net working time
-  sync [--from DATE] [--to DATE]  Backfill punches from GFOS into the stamp log (default: last 14 days)
+  sync [--from DATE] [--to DATE] [--refresh]
+                                  Backfill punches from GFOS into the stamp log (default: last 14 days)
+  days [--from DATE] [--to DATE] [--json] [--refresh]
+                                  Show the GFOS days: punches, Ist, absence, notes (default: today)
   correct <DATE> <in|out> <HH:MM> [--comment TEXT]
                                   Request a correction of a missing or wrong punch
   meetings [--from DATE] [--to DATE] [--json]
@@ -37,12 +41,18 @@ Commands:
   mcp                             Start the MCP server on stdio
 
 Options:
+  --refresh Read every requested day from GFOS instead of the local cache; fails without GFOS
   --debug   Log GFOS requests to stderr
   --help    Show this help
 
-Exit codes: 0 ok, 1 error, 2 GFOS not reachable.
+GFOS days are cached in $XDG_STATE_HOME/timebooking/days/<yyyy>.json. GFOS is contacted for today,
+for days that are not final yet (read before they ended, or with GFOS notes or an open interval),
+with --refresh, and always when TIMEBOOKING_ALWAYS_REFRESH=1. When it is not reachable, the cached
+data is printed, marked as stale, and the exit code is 2.
+
+Exit codes: 0 ok, 1 error, 2 GFOS not reachable (cached data printed when available).
 The calendar feed URL comes from the Secret Service (service=calendar-ics) or CALENDAR_ICS_URL.
-Files: $XDG_STATE_HOME/timebooking/status.json, stamp log $TIMEBOOKING_STAMP_LOG
+Files: stamp log $TIMEBOOKING_STAMP_LOG
 (default $XDG_STATE_HOME/timebooking/stamps.jsonl).`;
 
 const OPTIONS = {
@@ -50,6 +60,7 @@ const OPTIONS = {
   help: { type: 'boolean' },
   notify: { type: 'boolean' },
   json: { type: 'boolean' },
+  refresh: { type: 'boolean' },
   from: { type: 'string' },
   to: { type: 'string' },
   comment: { type: 'string' },
@@ -61,7 +72,8 @@ const COMMAND_OPTIONS: Record<Command['name'], OptionName[]> = {
   'clock-in': ['notify'],
   'clock-out': ['notify'],
   status: ['json'],
-  sync: ['from', 'to'],
+  sync: ['from', 'to', 'refresh'],
+  days: ['from', 'to', 'json', 'refresh'],
   meetings: ['from', 'to', 'json'],
   correct: ['comment'],
   mcp: [],
@@ -73,6 +85,7 @@ const COMMAND_ARGUMENTS: Record<Command['name'], number> = {
   'clock-out': 0,
   status: 0,
   sync: 0,
+  days: 0,
   meetings: 0,
   correct: 3,
   mcp: 0,
@@ -142,8 +155,15 @@ export function parseCliArgs(argv: string[], today: Date): CliArgs {
       return { command: { name, notify: values.notify ?? false }, debug };
     case 'status':
       return { command: { name, json: values.json ?? false }, debug };
-    case 'sync':
-      return { command: { name, ...parseRange(values, localDate(addDays(today, -14)), localDate(today)) }, debug };
+    case 'sync': {
+      const range = parseRange(values, localDate(addDays(today, -14)), localDate(today));
+      return { command: { name, ...range, refresh: values.refresh ?? false }, debug };
+    }
+    case 'days': {
+      // A single --from shows that day only.
+      const range = parseRange(values, localDate(today), values.from ?? localDate(today));
+      return { command: { name, ...range, json: values.json ?? false, refresh: values.refresh ?? false }, debug };
+    }
     case 'meetings': {
       // A single --from shows that day only.
       const range = parseRange(values, localDate(today), values.from ?? localDate(today));

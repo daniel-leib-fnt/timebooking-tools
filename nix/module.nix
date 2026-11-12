@@ -17,7 +17,8 @@ let
         --set-default GFOS_MANDANT ${lib.escapeShellArg cfg.mandant} \
         --set-default GFOS_ORG_EINHEIT ${lib.escapeShellArg cfg.orgEinheit} \
         --set-default GFOS_PERSONALNUMMER ${lib.escapeShellArg cfg.personalnummer} \
-        ${lib.optionalString (cfg.stampLog != null) "--set-default TIMEBOOKING_STAMP_LOG ${lib.escapeShellArg cfg.stampLog}"}
+        ${lib.optionalString (cfg.stampLog != null) "--set-default TIMEBOOKING_STAMP_LOG ${lib.escapeShellArg cfg.stampLog}"} \
+        ${lib.optionalString cfg.alwaysRefresh "--set-default TIMEBOOKING_ALWAYS_REFRESH 1"}
     '';
     meta.mainProgram = "timebooking";
   };
@@ -51,6 +52,16 @@ in
     personalnummer = lib.mkOption {
       type = lib.types.str;
       description = "GFOS Personalnummer. The password is read from the Secret Service (attribute service=gfos).";
+    };
+
+    alwaysRefresh = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Read every requested day from GFOS instead of the local day cache. When GFOS is not
+        reachable, the cached data is still returned, marked as stale. By default only today and
+        days that are not final yet are read from GFOS.
+      '';
     };
 
     stampLog = lib.mkOption {
